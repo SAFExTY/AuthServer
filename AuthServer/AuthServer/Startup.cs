@@ -41,16 +41,16 @@ namespace AuthServer
             var appSettings = appSettingSection.Get<AppSettings>();
             //todo load secret from env
             var key = Encoding.ASCII.GetBytes(appSettings.Secret);
-            services.AddAuthentication(a =>
+            services.AddAuthentication(x =>
                 {
-                    a.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                    a.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                    x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                    x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
                 })
-                .AddJwtBearer(builder =>
+                .AddJwtBearer(x =>
                 {
-                    builder.RequireHttpsMetadata = false;
-                    builder.SaveToken = true;
-                    builder.TokenValidationParameters = new TokenValidationParameters
+                    x.RequireHttpsMetadata = false;
+                    x.SaveToken = true;
+                    x.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuerSigningKey = true,
                         IssuerSigningKey = new SymmetricSecurityKey(key),
@@ -58,7 +58,7 @@ namespace AuthServer
                         ValidateAudience = false
                     };
                 });
-            
+
             // configure DI for application services
             services.AddScoped<IUserService, UserService>();
         }
@@ -74,6 +74,7 @@ namespace AuthServer
             app.UseHttpsRedirection();
 
             app.UseRouting();
+            app.UseAuthentication();
             app.UseAuthorization();
 
             // global cors policy
