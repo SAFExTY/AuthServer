@@ -13,6 +13,7 @@ namespace AuthServer.Migrations
     {
         private static DatabaseManager _instance;
         public bool IsReady { get; private set; }
+        private ArangoDBClient Client { get; set; }
 
         public static DatabaseManager GetDatabaseManager()
         {
@@ -24,8 +25,10 @@ namespace AuthServer.Migrations
             IsReady = false;
         }
 
-        public async void CreateIfNotExists()
+        public ArangoDBClient OpenConnection()
         {
+            if (Client != null)
+                return Client;
             var databaseSettings = Startup.AppSettings.Arango;
             // We must use the _system database to create databases
             var systemDbTransport = HttpApiTransport.UsingBasicAuth(
@@ -34,8 +37,18 @@ namespace AuthServer.Migrations
                 databaseSettings.User,
                 databaseSettings.Password
             );
-            var adb = new ArangoDBClient(systemDbTransport);
+            return Client = new ArangoDBClient(systemDbTransport);
+        }
 
+        public void CloseConnection()
+        {
+            Client?.Dispose();
+        }
+
+        public async void CreateIfNotExists()
+        {
+            var databaseSettings = Startup.AppSettings.Arango;
+            var adb = OpenConnection();
 
             // Lists all databases
             var dtbTask = await adb.Database.GetDatabasesAsync();
@@ -76,6 +89,7 @@ namespace AuthServer.Migrations
 
             IsReady = true;
             Console.WriteLine("Database created !");
+            CloseConnection();
         }
     }
 }
