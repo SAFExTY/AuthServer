@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using ArangoDBNetStandard;
-using ArangoDBNetStandard.DatabaseApi;
+using ArangoDBNetStandard.CollectionApi.Models;
 using ArangoDBNetStandard.DatabaseApi.Models;
 using ArangoDBNetStandard.Transport.Http;
 
@@ -89,6 +88,18 @@ namespace AuthServer.Migrations
 
             IsReady = true;
             Console.WriteLine("Database created !");
+            var dtbCollectionTask = await adb.Collection.PostCollectionAsync(new PostCollectionBody
+            {
+                Name = "users"
+            });
+            
+            if (dtbCollectionTask.Error)
+            {
+                Console.WriteLine("Unable to create collection ! Aborting...");
+                Environment.Exit(1);
+                return;
+            }
+
             CloseConnection();
         }
     }

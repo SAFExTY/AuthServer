@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Text;
 using AuthServer.Entities;
 using AuthServer.Helpers;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -13,37 +14,43 @@ namespace AuthServer.Services
 {
     public interface IUserService
     {
-        User Authenticate(string username, string password);
-        IEnumerable<User> GetAll();
+        IUser Authenticate(string username, string password);
+        IEnumerable<IUser> GetAll();
     }
-    
+
     public class UserService : IUserService
     {
         // hardcoded users database
         // todo store user in DB with hashed password
-        private ISet<User> _users = new HashSet<User>
-        {
-            new User
-            {
-                Id = 1, FirstName = "Valentin", LastName = "Chassignol", Username = "Tester", Password = "saucisse"
-            }
-        };
+        private ISet<IUser> _users = new HashSet<IUser>();
+        private PasswordHasher<InternalUser> passwordHasher = new PasswordHasher<InternalUser>();
 
         private readonly AppSettings _appSettings;
 
         public UserService(IOptions<AppSettings> appSettings)
         {
             _appSettings = appSettings.Value;
+            var defaultUser = new InternalUser
+            {
+                Id = 1, FirstName = "Valentin", LastName = "Chassignol", Username = "Tester"
+            };
+            defaultUser.Password = passwordHasher.HashPassword(defaultUser, "saucisse");
+            _users.Add(defaultUser);
         }
 
-        public User Authenticate(string username, string password)
+        public IUser Authenticate(string username, string password)
         {
-            var user = _users.SingleOrDefault(u =>
-                u.Username.ToLowerInvariant().Equals(username.ToLowerInvariant())
-                && u.Password.Equals(password));
+            // Username can also be the email
+            var user = (InternalUser) _users.SingleOrDefault(u =>
+                u.Username.ToLowerInvariant().Equals(username.ToLowerInvariant()) ||
+                u.Email.ToLowerInvariant().Equals(username.ToLowerInvariant()));
 
             // User not found
             if (user == null)
+                return null;
+
+            var result = passwordHasher.VerifyHashedPassword(user, user.Password, password);
+            if (result == PasswordVerificationResult.Failed)
                 return null;
 
             // Authentication successful, generate jwt token
@@ -62,12 +69,12 @@ namespace AuthServer.Services
             };
             var token = tokenHandler.CreateToken(tokenDescriptor);
             user.Token = tokenHandler.WriteToken(token);
-            return user.WithoutPassword();
+            return user;
         }
 
-        public IEnumerable<User> GetAll()
+        public IEnumerable<IUser> GetAll()
         {
-            return _users.WithoutPassword();
+            return _users;
         }
     }
 }
