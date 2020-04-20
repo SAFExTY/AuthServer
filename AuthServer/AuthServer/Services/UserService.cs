@@ -23,7 +23,7 @@ namespace AuthServer.Services
         // hardcoded users database
         // todo store user in DB with hashed password
         private ISet<IUser> _users = new HashSet<IUser>();
-        private PasswordHasher<InternalUser> passwordHasher = new PasswordHasher<InternalUser>();
+        private PasswordHasher<IUser> passwordHasher = new PasswordHasher<IUser>();
 
         private readonly AppSettings _appSettings;
 
@@ -41,7 +41,7 @@ namespace AuthServer.Services
         public IUser Authenticate(string username, string password)
         {
             // Username can also be the email
-            var user = (InternalUser) _users.SingleOrDefault(u =>
+            var user = _users.SingleOrDefault(u =>
                 u.Username.ToLowerInvariant().Equals(username.ToLowerInvariant()) ||
                 u.Email.ToLowerInvariant().Equals(username.ToLowerInvariant()));
 
@@ -49,7 +49,7 @@ namespace AuthServer.Services
             if (user == null)
                 return null;
 
-            var result = passwordHasher.VerifyHashedPassword(user, user.Password, password);
+            var result = passwordHasher.VerifyHashedPassword(user, ((InternalUser) user).Password, password);
             if (result == PasswordVerificationResult.Failed)
                 return null;
 
@@ -68,7 +68,7 @@ namespace AuthServer.Services
                     SecurityAlgorithms.HmacSha256Signature)
             };
             var token = tokenHandler.CreateToken(tokenDescriptor);
-            user.Token = tokenHandler.WriteToken(token);
+            ((InternalUser) user).Token = tokenHandler.WriteToken(token);
             return user;
         }
 
