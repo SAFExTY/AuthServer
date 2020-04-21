@@ -7,6 +7,7 @@
         public string LastName { get; }
         public string Username { get; }
         public string Email { get; }
+        public string Token { get; set; }
     }
 
     public class User : IUser
@@ -16,11 +17,13 @@
         public string LastName { get; set; }
         public string Username { get; set; }
         public string Email { get; set; }
+        public string Token { get; set; }
+
+        public string Game = null;
     }
 
     public sealed class InternalUser : User
     {
         public string Password { get; set; }
-        public string Token { get; set; }
     }
 }

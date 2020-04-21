@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using ArangoDBNetStandard;
 using ArangoDBNetStandard.CollectionApi.Models;
 using ArangoDBNetStandard.DatabaseApi.Models;
 using ArangoDBNetStandard.Transport.Http;
+using AuthServer.Entities;
+using AuthServer.Helpers;
 
 namespace AuthServer.Migrations
 {
@@ -13,6 +16,8 @@ namespace AuthServer.Migrations
         private static DatabaseManager _instance;
         public bool IsReady { get; private set; }
         private ArangoDBClient Client { get; set; }
+
+        private readonly DatabaseInfos _databaseSettings = Startup.AppSettings.Arango;
 
         public static DatabaseManager GetDatabaseManager()
         {
@@ -24,17 +29,19 @@ namespace AuthServer.Migrations
             IsReady = false;
         }
 
-        public ArangoDBClient OpenConnection()
+        public ArangoDBClient OpenConnection(string dbName = "_system", bool root = false)
         {
             if (Client != null)
                 return Client;
-            var databaseSettings = Startup.AppSettings.Arango;
+
+            var user = root ? _databaseSettings.User : _databaseSettings.DbUser;
+            var password = root ? _databaseSettings.Password : _databaseSettings.DbPassword;
             // We must use the _system database to create databases
             var systemDbTransport = HttpApiTransport.UsingBasicAuth(
-                new Uri(databaseSettings.Url),
-                "_system",
-                databaseSettings.User,
-                databaseSettings.Password
+                new Uri(_databaseSettings.Url),
+                dbName,
+                password,
+                user
             );
             return Client = new ArangoDBClient(systemDbTransport);
         }
@@ -42,12 +49,51 @@ namespace AuthServer.Migrations
         public void CloseConnection()
         {
             Client?.Dispose();
+            Client = null;
+        }
+
+        private async void CreateTestUser()
+        {
+            var adb = OpenConnection(_databaseSettings.DbName, true);
+            await adb.Document.PostDocumentAsync(
+                "users",
+                new InternalUser
+                {
+                    Email = "contact@vinetos.fr",
+                    Password = "hashed",
+                    Username = "vinetos",
+                    FirstName = "Valentin",
+                    LastName = "Chassignol"
+                });
+        }
+
+        public async Task<InternalUser> GetUser(string username)
+        {
+            var adb = OpenConnection(_databaseSettings.DbName, true);
+            //Email
+            var user = await adb.Cursor.PostCursorAsync<InternalUser>(
+                @"FOR doc IN users
+                            FILTER doc.Username == '" + username + "' || doc.Email == '" + username + @"'
+                            LIMIT 1
+                            RETURN doc");
+            return user.Result.FirstOrDefault();
+        }
+        
+        public async Task<IEnumerable<IUser>> GetUsers()
+        {
+            var adb = OpenConnection(_databaseSettings.DbName, true);
+            //Email
+            var user = await adb.Cursor.PostCursorAsync<InternalUser>(
+                @"FOR doc IN users
+                            LIMIT 1
+                            RETURN doc");
+            return user.Result;
         }
 
         public async void CreateIfNotExists()
         {
-            var databaseSettings = Startup.AppSettings.Arango;
-            var adb = OpenConnection();
+            // Use root user to check if the database exist (and create it if needed)
+            var adb = OpenConnection(root: true);
 
             // Lists all databases
             var dtbTask = await adb.Database.GetDatabasesAsync();
@@ -59,9 +105,10 @@ namespace AuthServer.Migrations
             }
 
             var databases = dtbTask.Result;
-            if (databases.Contains(databaseSettings.DbName))
+            if (databases.Contains(_databaseSettings.DbName))
             {
                 IsReady = true;
+                CloseConnection();
                 Console.WriteLine("Database ready !");
                 return;
             }
@@ -69,13 +116,14 @@ namespace AuthServer.Migrations
             // Create the database with one user.
             var dtbPostTask = await adb.Database.PostDatabaseAsync(new PostDatabaseBody
             {
-                Name = databaseSettings.DbName,
+                Name = _databaseSettings.DbName,
                 Users = new List<DatabaseUser>
                 {
+                    //todo Fork the api to manager user permission
                     new DatabaseUser
                     {
-                        Username = databaseSettings.DbUser,
-                        Passwd = databaseSettings.DbPassword
+                        Username = _databaseSettings.DbUser,
+                        Passwd = _databaseSettings.DbPassword,
                     }
                 }
             });
@@ -88,11 +136,14 @@ namespace AuthServer.Migrations
 
             IsReady = true;
             Console.WriteLine("Database created !");
+            CloseConnection();
+            // Switch db to create collection
+            adb = OpenConnection(_databaseSettings.DbName, true);
             var dtbCollectionTask = await adb.Collection.PostCollectionAsync(new PostCollectionBody
             {
-                Name = "users"
+                Name = "users",
             });
-            
+
             if (dtbCollectionTask.Error)
             {
                 Console.WriteLine("Unable to create collection ! Aborting...");
