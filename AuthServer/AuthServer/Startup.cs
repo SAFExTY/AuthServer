@@ -58,6 +58,7 @@ namespace AuthServer
 
             // configure DI for application services
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IGameService, GameService>();
 
             // Configure database
             DatabaseManager.GetDatabaseManager().CreateIfNotExists();

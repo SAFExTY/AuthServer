@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using ArangoDBNetStandard;
 using ArangoDBNetStandard.CollectionApi.Models;
 using ArangoDBNetStandard.DatabaseApi.Models;
+using ArangoDBNetStandard.DocumentApi.Models;
 using ArangoDBNetStandard.Transport.Http;
 using AuthServer.Entities;
 using AuthServer.Helpers;
@@ -52,21 +54,6 @@ namespace AuthServer.Migrations
             Client = null;
         }
 
-        private async void CreateTestUser()
-        {
-            var adb = OpenConnection(_databaseSettings.DbName, true);
-            await adb.Document.PostDocumentAsync(
-                "users",
-                new InternalUser
-                {
-                    Email = "contact@vinetos.fr",
-                    Password = "hashed",
-                    Username = "vinetos",
-                    FirstName = "Valentin",
-                    LastName = "Chassignol"
-                });
-        }
-
         public async Task<InternalUser> GetUser(string username)
         {
             var adb = OpenConnection(_databaseSettings.DbName, true);
@@ -78,7 +65,7 @@ namespace AuthServer.Migrations
                             RETURN doc");
             return user.Result.FirstOrDefault();
         }
-        
+
         public async Task<IEnumerable<IUser>> GetUsers()
         {
             var adb = OpenConnection(_databaseSettings.DbName, true);
@@ -88,6 +75,40 @@ namespace AuthServer.Migrations
                             LIMIT 1
                             RETURN doc");
             return user.Result;
+        }
+
+        public async Task<Save> GetSave(string gameId)
+        {
+            var adb = OpenConnection(_databaseSettings.DbName, true);
+            var save = await adb.Cursor.PostCursorAsync<InternalSave>(
+                @"FOR doc IN games
+                            FILTER doc._key == '" + gameId + @"'
+                            LIMIT 1
+                            RETURN doc");
+            return save.Result.FirstOrDefault();
+        }
+
+        public async Task<(Task<PostDocumentResponse<Save>>, Task<PostDocumentResponse<Save>>)> Update(string gameId,
+            JsonElement game)
+        {
+            var adb = OpenConnection(_databaseSettings.DbName, true);
+            var returnVal = adb.Document.PutDocumentAsync(
+                $"games/{gameId}",
+                new Save
+                {
+                    Game = game
+                }
+            );
+            var taskPost = adb.Document.PostDocumentAsync(
+                "games",
+                new Save
+                {
+                    _key = gameId,
+                    Game = game
+                });
+            returnVal.ContinueWith(response => response.Exception != null ? null : taskPost);
+            CloseConnection();
+            return (returnVal, taskPost);
         }
 
         public async void CreateIfNotExists()

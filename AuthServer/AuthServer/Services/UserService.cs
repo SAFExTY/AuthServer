@@ -53,7 +53,7 @@ namespace AuthServer.Services
                 {
                     Subject = new ClaimsIdentity(new[]
                     {
-                        new Claim(ClaimTypes.Name, user.Id.ToString()),
+                        new Claim(ClaimTypes.Name, user.GameId),
                     }),
                     // todo remove magic expiration value
                     Expires = DateTime.UtcNow.AddDays(7),
@@ -61,10 +61,37 @@ namespace AuthServer.Services
                         SecurityAlgorithms.HmacSha256Signature)
                 };
                 var token = tokenHandler.CreateToken(tokenDescriptor);
-                user.Token = tokenHandler.WriteToken(token);
-                return user;
+                // Prevent to send sensitive information like the password
+                return new User
+                {
+                    Email = user.Email,
+                    GameId = user.GameId,
+                    FirstName = user.FirstName,
+                    Username = user.Username,
+                    LastName = user.LastName,
+                    Token = tokenHandler.WriteToken(token),
+                };
             }
         }
+
+        public void Tester()
+        {
+            var adb = DatabaseManager.GetDatabaseManager().OpenConnection("sshcity", true);
+            var user = new InternalUser
+            {
+                Email = "test@tester.fr",
+                Username = "tester",
+                FirstName = "The tested",
+                LastName = "Tester"
+            };
+            user.Password = _passwordHasher.HashPassword(user, "password");
+            adb.Document.PostDocumentAsync(
+                "users",
+                user
+            );
+            DatabaseManager.GetDatabaseManager().CloseConnection();
+        }
+
 
         public IEnumerable<IUser> GetAll()
         {
