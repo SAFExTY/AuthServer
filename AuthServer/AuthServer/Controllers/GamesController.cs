@@ -26,11 +26,14 @@ namespace AuthServer.Controllers
             return BadRequest();
         }
 
-        [HttpGet]
-        public IActionResult GetAll([FromBody] GetGameModel model)
+        [HttpGet("{gameId}")]
+        public IActionResult Get(string gameId)
         {
-            var saved = _gameService.Get(model.GameId);
-            return Ok(saved.Game.ToString());
+            Console.WriteLine(gameId);
+            var saved = _gameService.Get(gameId);
+            if (saved == null)
+                return NotFound();
+            return Ok(saved.Game);
         }
     }
 }
