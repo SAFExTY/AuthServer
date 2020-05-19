@@ -11,6 +11,6 @@ namespace AuthServer.Models
     public class UpdateGameModel
     {
         [Required] public string GameId { get; set; }
-        [Required] public JsonElement Game { get; set; }
+        [Required] public string Game { get; set; }
     }
 }

@@ -77,10 +77,10 @@ namespace AuthServer.Migrations
             return user.Result;
         }
 
-        public async Task<Save> GetSave(string gameId)
+        public async Task<ISave> GetSave(string gameId)
         {
             var adb = OpenConnection(_databaseSettings.DbName, true);
-            var save = await adb.Cursor.PostCursorAsync<InternalSave>(
+            var save = await adb.Cursor.PostCursorAsync<Save>(
                 @"FOR doc IN games
                             FILTER doc._key == '" + gameId + @"'
                             LIMIT 1
@@ -89,7 +89,7 @@ namespace AuthServer.Migrations
         }
 
         public async Task<(Task<PostDocumentResponse<Save>>, Task<PostDocumentResponse<Save>>)> Update(string gameId,
-            JsonElement game)
+            string game)
         {
             var adb = OpenConnection(_databaseSettings.DbName, true);
             var returnVal = adb.Document.PutDocumentAsync(

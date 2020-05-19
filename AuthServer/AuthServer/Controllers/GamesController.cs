@@ -30,7 +30,7 @@ namespace AuthServer.Controllers
         public IActionResult GetAll([FromBody] GetGameModel model)
         {
             var saved = _gameService.Get(model.GameId);
-            return Ok(saved);
+            return Ok(saved.Game.ToString());
         }
     }
 }
