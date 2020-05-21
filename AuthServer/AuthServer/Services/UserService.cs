@@ -16,6 +16,8 @@ namespace AuthServer.Services
     public interface IUserService
     {
         IUser Authenticate(string username, string password);
+        bool Exist(string username, string email);
+        IUser Create(InternalUser user);
         IEnumerable<IUser> GetAll();
     }
 
@@ -74,24 +76,28 @@ namespace AuthServer.Services
             }
         }
 
-        public void Tester()
+        public bool Exist(string username, string email)
+        {
+            var task = DatabaseManager.GetDatabaseManager().GetUser(username, email);
+            lock (task)
+            {
+                return task.Result != null;
+            }
+        }
+
+        public IUser Create(InternalUser user)
         {
             var adb = DatabaseManager.GetDatabaseManager().OpenConnection("sshcity", true);
-            var user = new InternalUser
-            {
-                Email = "test@tester.fr",
-                Username = "tester",
-                FirstName = "The tested",
-                LastName = "Tester"
-            };
-            user.Password = _passwordHasher.HashPassword(user, "password");
+            var rawPassword = user.Password;
+            user.Password = _passwordHasher.HashPassword(user, rawPassword); // Replace password with hashed version
+            user.GameId = Guid.NewGuid().ToString(); // Generate a new GameID
+            user.Token = null; // Ensure null
             adb.Document.PostDocumentAsync(
                 "users",
                 user
             );
-            DatabaseManager.GetDatabaseManager().CloseConnection();
+            return Authenticate(user.Username, rawPassword);
         }
-
 
         public IEnumerable<IUser> GetAll()
         {

@@ -54,13 +54,14 @@ namespace AuthServer.Migrations
             Client = null;
         }
 
-        public async Task<InternalUser> GetUser(string username)
+        public async Task<InternalUser> GetUser(string username, string email = null)
         {
             var adb = OpenConnection(_databaseSettings.DbName, true);
             //Email
+            email ??= username;
             var user = await adb.Cursor.PostCursorAsync<InternalUser>(
                 @"FOR doc IN users
-                            FILTER doc.Username == '" + username + "' || doc.Email == '" + username + @"'
+                            FILTER doc.Username == '" + username + "' || doc.Email == '" + email + @"'
                             LIMIT 1
                             RETURN doc");
             return user.Result.FirstOrDefault();
