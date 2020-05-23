@@ -161,14 +161,19 @@ namespace AuthServer.Migrations
             CloseConnection();
             // Switch db to create collection
             adb = OpenConnection(_databaseSettings.DbName, true);
-            var dtbCollectionTask = await adb.Collection.PostCollectionAsync(new PostCollectionBody
+            var userCollectionTask = await adb.Collection.PostCollectionAsync(new PostCollectionBody
             {
-                Name = "users",
+                Name = "users"
+            });
+            adb = OpenConnection(_databaseSettings.DbName, true);
+            var gameCollectionTask = await adb.Collection.PostCollectionAsync(new PostCollectionBody
+            {
+                Name = "games"
             });
 
-            if (dtbCollectionTask.Error)
+            if (userCollectionTask.Error || gameCollectionTask.Error)
             {
-                Console.WriteLine("Unable to create collection ! Aborting...");
+                Console.WriteLine("Unable to create collections ! Aborting...");
                 Environment.Exit(1);
                 return;
             }
